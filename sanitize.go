@@ -109,9 +109,9 @@ func escapeUrlComponent(w stringWriterWriter, val string) error {
 			// "&#39;" is shorter than "&apos;" and apos was not in HTML until HTML5.
 			esc = "&#39;"
 		case '<':
-			esc = "&lt;"
+			esc = "<"
 		case '>':
-			esc = "&gt;"
+			esc = ">"
 		case '"':
 			// "&#34;" is shorter than "&quot;".
 			esc = "&#34;"
@@ -436,7 +436,7 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 					}
 				default:
 					// HTML escape the text
-					if _, err := buff.WriteString(token.String()); err != nil {
+					if _, err := buff.WriteString(HandleToken(token)); err != nil {
 						return err
 					}
 				}
@@ -447,6 +447,52 @@ func (p *Policy) sanitize(r io.Reader, w io.Writer) error {
 			return fmt.Errorf("unknown token: %v", token)
 		}
 	}
+}
+
+const escapedChars = "&'<>\"\r"
+
+func HandleToken(t html.Token) string {
+	switch t.Type {
+	case html.ErrorToken:
+		return ""
+	case html.TextToken:
+		return EscapeString(t.Data)
+	case html.StartTagToken:
+		return "<" + TagString(t) + ">"
+	case html.EndTagToken:
+		return "</" + TagString(t) + ">"
+	case html.SelfClosingTagToken:
+		return "<" + TagString(t) + "/>"
+	case html.CommentToken:
+		return "<!--" + t.Data + "-->"
+	case html.DoctypeToken:
+		return "<!DOCTYPE " + t.Data + ">"
+	}
+	return "Invalid(" + strconv.Itoa(int(t.Type)) + ")"
+}
+
+func EscapeString(s string) string {
+	if strings.IndexAny(s, escapedChars) == -1 {
+		return s
+	}
+	var buf bytes.Buffer
+	_ = escapeUrlComponent(&buf, s)
+	return buf.String()
+}
+
+func TagString(t html.Token) string {
+	if len(t.Attr) == 0 {
+		return t.Data
+	}
+	buf := bytes.NewBufferString(t.Data)
+	for _, a := range t.Attr {
+		buf.WriteByte(' ')
+		buf.WriteString(a.Key)
+		buf.WriteString(`="`)
+		_ = escapeUrlComponent(buf, a.Val)
+		buf.WriteByte('"')
+	}
+	return buf.String()
 }
 
 // sanitizeAttrs takes a set of element attribute policies and the global
@@ -524,11 +570,11 @@ attrsLoop:
 			for _, ap := range apl {
 				if ap.regexp != nil {
 					if ap.regexp.MatchString(htmlAttr.Val) {
-				htmlAttr.Val = escapeAttribute(htmlAttr.Val)
+						htmlAttr.Val = escapeAttribute(htmlAttr.Val)
 						cleanAttrs = append(cleanAttrs, htmlAttr)
 					}
 				} else {
-				htmlAttr.Val = escapeAttribute(htmlAttr.Val)
+					htmlAttr.Val = escapeAttribute(htmlAttr.Val)
 					cleanAttrs = append(cleanAttrs, htmlAttr)
 				}
 			}
