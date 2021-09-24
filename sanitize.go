@@ -114,7 +114,7 @@ func escapeUrlComponent(w stringWriterWriter, val string) error {
 			esc = ">"
 		case '"':
 			// "&#34;" is shorter than "&quot;".
-			esc = "&#34;"
+			esc = "\""
 		case '\r':
 			esc = "&#13;"
 		default:
