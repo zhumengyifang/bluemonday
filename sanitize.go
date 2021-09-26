@@ -107,7 +107,7 @@ func escapeUrlComponent(w stringWriterWriter, val string) error {
 		switch val[i] {
 		case '\'':
 			// "&#39;" is shorter than "&apos;" and apos was not in HTML until HTML5.
-			esc = "&#39;"
+			esc = "\\"
 		case '<':
 			esc = "<"
 		case '>':
